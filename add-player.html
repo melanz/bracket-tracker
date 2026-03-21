@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add new player — March Madness 2026</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>Add new player</h1>
+      <p class="tagline">Pick all four First Four winners to unlock the bracket, then click through to the champion. Saves one CSV under <code>data/players/</code>.</p>
+      <nav class="site-nav">
+        <a href="index.html">Leaderboard</a>
+        <a href="admin.html">Update master bracket</a>
+        <a href="add-player.html">Add new player</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="panel add-player-form">
+        <div class="name-row">
+          <label>
+            Display name
+            <input type="text" id="input-name" placeholder="Jane Doe" autocomplete="off" />
+          </label>
+          <label>
+            File name (slug)
+            <input type="text" id="input-slug" placeholder="jane-doe" autocomplete="off" pattern="[a-z0-9][a-z0-9-]*" title="Lowercase letters, numbers, hyphens" />
+          </label>
+        </div>
+        <p class="admin-note">The slug becomes <code>data/players/&lt;slug&gt;.csv</code> and must match <code>^[a-z0-9][a-z0-9-]*$</code>.</p>
+      </section>
+
+      <div id="first-four-host"></div>
+      <section id="bracket-placeholder" class="panel bracket-placeholder" aria-live="polite">
+        <p>
+          <strong>Main bracket locked.</strong> Pick a winner in all four First Four games above. The full tournament bracket will appear here.
+        </p>
+      </section>
+      <div id="bracket-main" class="bracket-main" hidden></div>
+
+      <div class="admin-bar add-player-actions">
+        <button type="button" id="btn-save" class="btn btn-primary" disabled>Save player CSV</button>
+        <button type="button" id="btn-download" class="btn" disabled>Download only</button>
+        <span id="save-status" class="status-unsaved" aria-live="polite"></span>
+      </div>
+      <p class="admin-note" id="save-hint"></p>
+      <p class="admin-note"><a href="index.html">Back to leaderboard</a></p>
+    </main>
+
+    <footer class="site-footer">
+      <small>Serve over HTTP. In Chrome/Edge you can pick the project folder to write files; otherwise use Download and copy into <code>data/players/</code>.</small>
+    </footer>
+
+    <script src="app.js"></script>
+    <script src="add-player.js"></script>
+  </body>
+</html>

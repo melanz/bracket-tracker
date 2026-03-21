@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Update master bracket — March Madness 2026</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <h1>Master bracket editor</h1>
+    <p class="tagline">Click a team to record the winner. Use Clear to undo a game. Then save <code>master.csv</code>.
+    </p>
+    <nav class="site-nav">
+      <a href="index.html">Leaderboard</a>
+      <a href="add-player.html">Add new player</a>
+      <a href="admin.html">Update master bracket</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="admin-bar">
+      <button type="button" id="btn-save" class="btn btn-primary">Save master.csv</button>
+      <button type="button" id="btn-download" class="btn">Download only</button>
+      <span id="save-status" class="status-unsaved" aria-live="polite"></span>
+    </div>
+    <p class="admin-note">
+      Games unlock when both teams are known. Saving uses the File System Access API in Chrome/Edge (choose
+      <code>data/master.csv</code>); other browsers download a file you can move into <code>data/</code>.
+      First Four results are fixed in <code>data/first_four.csv</code> and <code>data/bracket.csv</code>.
+    </p>
+    <section id="first-four-host"></section>
+    <div id="bracket-main" class="bracket-main"></div>
+  </main>
+
+  <footer class="site-footer">
+    <small>Run a local server from the project folder so <code>fetch</code> can load CSV files.</small>
+  </footer>
+
+  <script src="app.js"></script>
+  <script src="admin.js"></script>
+</body>
+
+</html>

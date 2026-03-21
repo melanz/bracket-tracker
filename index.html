@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>March Madness 2026 — Bracket Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a href="/" class="logo-link" aria-label="March Madness 2026 — Home">
+        <svg class="site-logo" viewBox="0 0 800 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="March Madness 2026 Bracket Tracker">
+          <rect x="0.5" y="0.5" width="799" height="119" rx="14" fill="none" stroke="#0d1a2d" stroke-width="1"/>
+          <rect x="3" y="3" width="794" height="114" rx="12" fill="#0b1018" stroke="#1c2e48" stroke-width="1.5"/>
+
+          <g stroke="#3d7eff" stroke-width="2" fill="none" opacity="0.6" stroke-linecap="round">
+            <line x1="16" y1="14" x2="28" y2="14"/><line x1="16" y1="25" x2="28" y2="25"/>
+            <line x1="16" y1="38" x2="28" y2="38"/><line x1="16" y1="49" x2="28" y2="49"/>
+            <line x1="16" y1="62" x2="28" y2="62"/><line x1="16" y1="73" x2="28" y2="73"/>
+            <line x1="16" y1="86" x2="28" y2="86"/><line x1="16" y1="97" x2="28" y2="97"/>
+            <path d="M28,14 V25 M28,20 H42"/>
+            <path d="M28,38 V49 M28,44 H42"/>
+            <path d="M28,62 V73 M28,68 H42"/>
+            <path d="M28,86 V97 M28,92 H42"/>
+            <path d="M42,20 V44 M42,32 H56"/>
+            <path d="M42,68 V92 M42,80 H56"/>
+            <path d="M56,32 V80 M56,56 H72"/>
+          </g>
+
+          <g stroke="#3d7eff" stroke-width="2" fill="none" opacity="0.6" stroke-linecap="round">
+            <line x1="784" y1="14" x2="772" y2="14"/><line x1="784" y1="25" x2="772" y2="25"/>
+            <line x1="784" y1="38" x2="772" y2="38"/><line x1="784" y1="49" x2="772" y2="49"/>
+            <line x1="784" y1="62" x2="772" y2="62"/><line x1="784" y1="73" x2="772" y2="73"/>
+            <line x1="784" y1="86" x2="772" y2="86"/><line x1="784" y1="97" x2="772" y2="97"/>
+            <path d="M772,14 V25 M772,20 H758"/>
+            <path d="M772,38 V49 M772,44 H758"/>
+            <path d="M772,62 V73 M772,68 H758"/>
+            <path d="M772,86 V97 M772,92 H758"/>
+            <path d="M758,20 V44 M758,32 H744"/>
+            <path d="M758,68 V92 M758,80 H744"/>
+            <path d="M744,32 V80 M744,56 H728"/>
+          </g>
+
+          <text x="400" y="62" text-anchor="middle" font-family="'Segoe UI',system-ui,sans-serif" font-style="italic" font-size="56" font-weight="900" fill="#ffffff" letter-spacing="5">MARCH MADNESS</text>
+
+          <line x1="160" y1="76" x2="640" y2="76" stroke="#3d7eff" stroke-width="1" opacity="0.35"/>
+          <text x="400" y="102" text-anchor="middle" font-family="'Segoe UI',system-ui,sans-serif" font-size="16" letter-spacing="3">
+            <tspan fill="#3d7eff" font-weight="700" letter-spacing="6">2026</tspan>
+            <tspan dx="16" fill="#8b9cb3" font-weight="600" letter-spacing="4">BRACKET TRACKER</tspan>
+          </text>
+        </svg>
+      </a>
+    </header>
+
+    <main>
+      <section id="view-leaderboard" class="panel">
+        <h2>Leaderboard</h2>
+        <div id="leaderboard"></div>
+        <div id="contested-games"></div>
+      </section>
+
+      <section id="bracket-view" class="panel" hidden>
+        <div class="bracket-toolbar">
+          <a id="back-to-leaderboard" class="back-link" href="#">&larr; Leaderboard</a>
+          <h2 id="bracket-title">Bracket</h2>
+          <div id="tab-bar" class="tab-bar" role="tablist"></div>
+        </div>
+        <div id="bracket-main" class="bracket-main"></div>
+        <div id="first-four-host"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+    </footer>
+
+    <div id="game-popup-overlay" class="game-popup-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="game-popup-title" aria-hidden="true">
+      <div class="game-popup">
+        <button type="button" class="game-popup-close" aria-label="Close">&times;</button>
+        <div id="game-popup-content"></div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
