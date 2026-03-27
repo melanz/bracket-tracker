@@ -14,6 +14,39 @@ const REGION_ROUNDS = [
 
 const FINAL_FOUR = { games: [4, 5, 6, 7], semis: [2, 3], champ: 1 };
 
+// --- Price Is Right fail horn (Web Audio synthesis) ---
+
+function playPriceIsRightFail() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const notes = [
+    { freq: 233.08, start: 0, end: 0.28 },
+    { freq: 220.00, start: 0.30, end: 0.58 },
+    { freq: 207.65, start: 0.60, end: 0.88 },
+    { freq: 196.00, start: 0.90, end: 2.0 },
+  ];
+  const master = ctx.createGain();
+  master.gain.value = 0.25;
+  master.connect(ctx.destination);
+  for (const n of notes) {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(n.freq, ctx.currentTime + n.start);
+    if (n === notes[notes.length - 1]) {
+      osc.frequency.exponentialRampToValueAtTime(n.freq * 0.88, ctx.currentTime + n.end);
+    }
+    env.gain.setValueAtTime(0.0001, ctx.currentTime + n.start);
+    env.gain.exponentialRampToValueAtTime(1, ctx.currentTime + n.start + 0.03);
+    env.gain.setValueAtTime(1, ctx.currentTime + n.end - 0.15);
+    env.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + n.end);
+    osc.connect(env);
+    env.connect(master);
+    osc.start(ctx.currentTime + n.start);
+    osc.stop(ctx.currentTime + n.end + 0.01);
+  }
+  setTimeout(() => ctx.close(), 2500);
+}
+
 // --- CSV ---
 
 function parseCSV(text) {
@@ -250,9 +283,120 @@ function scoreFirstFour(playerFf, masterFf) {
   return s;
 }
 
+// --- Ways to first place ---
+
+const MAX_UNDECIDED_FOR_ENUM = 25;
+const MAX_SAMPLE_SCENARIOS = 20;
+
+/**
+ * Enumerate every possible completion of the bracket and count how many
+ * result in each player finishing first.  Also collect up to
+ * MAX_SAMPLE_SCENARIOS concrete winning snapshots per player.
+ *
+ * @param {number[]} master - full tree (seeds 64-127 + decided internals)
+ * @param {Object<string,number[]>} players - slug → player pick tree
+ * @param {Array} leaderboardData - rows with { slug, score }
+ * @returns {{ waysToFirst: Object<string,number>, sampleScenarios: Object<string,Array>, totalScenarios: number } | null}
+ */
+function computeWaysToFirst(master, players, leaderboardData) {
+  const undecided = [];
+  for (let p = 1; p <= 63; p++) {
+    if (master[p] == null) undecided.push(p);
+  }
+  undecided.sort((a, b) => b - a);
+
+  if (undecided.length > MAX_UNDECIDED_FOR_ENUM) return null;
+
+  const slugs = leaderboardData.map((r) => r.slug);
+  const n = slugs.length;
+
+  if (undecided.length === 0) {
+    const maxScore = Math.max(...leaderboardData.map((r) => r.score));
+    const waysToFirst = {};
+    const sampleScenarios = {};
+    for (const r of leaderboardData) {
+      const isFirst = r.score === maxScore;
+      waysToFirst[r.slug] = isFirst ? 1 : 0;
+      sampleScenarios[r.slug] = isFirst
+        ? [{ outcomes: [], scores: Object.fromEntries(leaderboardData.map((x) => [x.slug, x.score])) }]
+        : [];
+    }
+    return { waysToFirst, sampleScenarios, totalScenarios: 1 };
+  }
+
+  const playerPicksAtUndecided = [];
+  for (let u = 0; u < undecided.length; u++) {
+    const pos = undecided[u];
+    const arr = new Array(n);
+    for (let i = 0; i < n; i++) {
+      arr[i] = players[slugs[i]][pos] ?? -1;
+    }
+    playerPicksAtUndecided.push(arr);
+  }
+
+  const runningScores = new Array(n);
+  for (let i = 0; i < n; i++) runningScores[i] = leaderboardData[i].score;
+
+  const waysToFirst = {};
+  const sampleScenarios = {};
+  for (const s of slugs) {
+    waysToFirst[s] = 0;
+    sampleScenarios[s] = [];
+  }
+
+  const currentMaster = master.slice();
+  let totalScenarios = 0;
+
+  function dfs(idx) {
+    if (idx === undecided.length) {
+      totalScenarios++;
+      let maxScore = -1;
+      for (let i = 0; i < n; i++) {
+        if (runningScores[i] > maxScore) maxScore = runningScores[i];
+      }
+      for (let i = 0; i < n; i++) {
+        if (runningScores[i] === maxScore) {
+          const slug = slugs[i];
+          waysToFirst[slug]++;
+          if (sampleScenarios[slug].length < MAX_SAMPLE_SCENARIOS) {
+            const outcomes = undecided.map((pos) => ({ position: pos, winnerId: currentMaster[pos] }));
+            const scores = {};
+            for (let j = 0; j < n; j++) scores[slugs[j]] = runningScores[j];
+            sampleScenarios[slug].push({ outcomes, scores });
+          }
+        }
+      }
+      return;
+    }
+
+    const pos = undecided[idx];
+    const left = currentMaster[2 * pos];
+    const right = currentMaster[2 * pos + 1];
+
+    const candidates = left !== right ? [left, right] : [left];
+    for (const winner of candidates) {
+      if (winner == null) continue;
+      currentMaster[pos] = winner;
+      const bonusIndices = [];
+      for (let i = 0; i < n; i++) {
+        if (playerPicksAtUndecided[idx][i] === winner) {
+          runningScores[i]++;
+          bonusIndices.push(i);
+        }
+      }
+      dfs(idx + 1);
+      for (const i of bonusIndices) runningScores[i]--;
+    }
+    currentMaster[pos] = null;
+  }
+
+  dfs(0);
+  return { waysToFirst, sampleScenarios, totalScenarios };
+}
+
 // --- Render: leaderboard ---
 
-function renderLeaderboard(container, rows, onSelect) {
+function renderLeaderboard(container, rows, onSelect, onWaysClick) {
   container.innerHTML = '';
   if (!rows.length) {
     const empty = document.createElement('div');
@@ -263,18 +407,48 @@ function renderLeaderboard(container, rows, onSelect) {
     container.appendChild(empty);
     return;
   }
+  const hasWays = rows[0] && rows[0].totalScenarios != null;
   const table = document.createElement('table');
   table.className = 'leaderboard';
   table.innerHTML = `
-    <thead><tr><th>Rank</th><th>Player</th><th>Score</th><th>Max possible</th><th></th></tr></thead>
+    <thead><tr><th>Rank</th><th>Player</th><th>Score</th><th>Max possible</th>${hasWays ? '<th>Ways to 1st</th>' : ''}<th></th></tr></thead>
     <tbody></tbody>`;
   const tbody = table.querySelector('tbody');
   rows.forEach((r, i) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i + 1}</td><td class="player-name">${escapeHtml(r.name)}</td><td>${r.score}</td><td>${r.maxPossible}</td><td><span class="view-bracket-btn">View Bracket &rarr;</span></td>`;
+    let waysCell = '';
+    if (hasWays) {
+      const waysText = `${r.waysToFirst.toLocaleString()} / ${r.totalScenarios.toLocaleString()}`;
+      if (r.waysToFirst > 0 && onWaysClick) {
+        waysCell = `<td class="ways-to-first-cell"><span class="ways-to-first-link">${waysText}</span></td>`;
+      } else if (r.waysToFirst === 0) {
+        waysCell = `<td class="ways-to-first-cell"><span class="ways-to-first-zero">${waysText}</span></td>`;
+      } else {
+        waysCell = `<td class="ways-to-first-cell">${waysText}</td>`;
+      }
+    }
+    tr.innerHTML = `<td>${i + 1}</td><td class="player-name">${escapeHtml(r.name)}</td><td>${r.score}</td><td>${r.maxPossible}</td>${waysCell}<td><span class="view-bracket-btn">View Bracket &rarr;</span></td>`;
     tr.tabIndex = 0;
     tr.setAttribute('role', 'link');
     tr.setAttribute('aria-label', `View bracket for ${r.name}`);
+    if (hasWays && r.waysToFirst > 0 && onWaysClick) {
+      const waysLink = tr.querySelector('.ways-to-first-link');
+      if (waysLink) {
+        waysLink.addEventListener('click', (e) => {
+          e.stopPropagation();
+          onWaysClick(r.slug);
+        });
+      }
+    }
+    if (hasWays && r.waysToFirst === 0) {
+      const zeroLink = tr.querySelector('.ways-to-first-zero');
+      if (zeroLink) {
+        zeroLink.addEventListener('click', (e) => {
+          e.stopPropagation();
+          playPriceIsRightFail();
+        });
+      }
+    }
     tr.addEventListener('click', () => onSelect(r.slug || r.name));
     tr.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') onSelect(r.slug || r.name);
@@ -1065,6 +1239,16 @@ async function initApp() {
       })
       .sort((a, b) => b.score - a.score || b.maxPossible - a.maxPossible);
 
+    const waysResult = computeWaysToFirst(master, players, leaderboardData);
+    let scenarioData = null;
+    if (waysResult) {
+      scenarioData = waysResult;
+      for (const r of leaderboardData) {
+        r.waysToFirst = waysResult.waysToFirst[r.slug] || 0;
+        r.totalScenarios = waysResult.totalScenarios;
+      }
+    }
+
     const masterLabel = 'Master (actual)';
     let bracketViewSeeds = seeds;
     let bracketPlayerTree = master;
@@ -1224,6 +1408,132 @@ async function initApp() {
       });
     }
 
+    function openScenarioPopup(slug) {
+      if (!gamePopupOverlay || !gamePopupContent || !scenarioData) return;
+      clearTimeout(gamePopupCloseTimer);
+      renderScenarioPopupContent(slug);
+      gamePopupOverlay.hidden = false;
+      gamePopupOverlay.setAttribute('aria-hidden', 'false');
+      requestAnimationFrame(() => {
+        gamePopupOverlay.classList.add('game-popup-overlay--open');
+      });
+    }
+
+    function renderScenarioPopupContent(slug) {
+      if (!gamePopupContent || !scenarioData) return;
+      gamePopupContent.innerHTML = '';
+
+      const playerRow = leaderboardData.find((r) => r.slug === slug);
+      const displayName = playerRow ? playerRow.name : slug;
+      const ways = scenarioData.waysToFirst[slug] || 0;
+      const total = scenarioData.totalScenarios;
+      const samples = scenarioData.sampleScenarios[slug] || [];
+
+      const header = document.createElement('div');
+      header.className = 'game-popup-header';
+
+      const h2 = document.createElement('h2');
+      h2.className = 'game-popup-title';
+      h2.id = 'game-popup-title';
+      h2.textContent = `Ways to 1st for ${displayName}`;
+
+      const sub = document.createElement('p');
+      sub.className = 'game-popup-sub';
+      sub.textContent = `${ways.toLocaleString()} of ${total.toLocaleString()} possible outcomes`;
+
+      header.appendChild(h2);
+      header.appendChild(sub);
+      gamePopupContent.appendChild(header);
+
+      if (!samples.length) {
+        const none = document.createElement('p');
+        none.className = 'game-popup-sub';
+        none.textContent = 'No winning scenarios for this player.';
+        gamePopupContent.appendChild(none);
+        return;
+      }
+
+      const note = document.createElement('p');
+      note.className = 'scenario-sample-note';
+      note.textContent = samples.length < ways
+        ? `Showing ${samples.length} of ${ways.toLocaleString()} winning scenarios`
+        : `All ${ways} winning scenario${ways > 1 ? 's' : ''}`;
+      gamePopupContent.appendChild(note);
+
+      const scrollWrap = document.createElement('div');
+      scrollWrap.className = 'scenario-scroll';
+
+      samples.forEach((scenario, idx) => {
+        const card = document.createElement('div');
+        card.className = 'scenario-card';
+
+        const cardHeader = document.createElement('div');
+        cardHeader.className = 'scenario-card-header';
+
+        const label = document.createElement('span');
+        label.className = 'scenario-card-label';
+        label.textContent = `Scenario ${idx + 1}`;
+
+        const scoresWrap = document.createElement('span');
+        scoresWrap.className = 'scenario-card-scores';
+        const sortedSlugs = Object.keys(scenario.scores).sort((a, b) => scenario.scores[b] - scenario.scores[a]);
+        for (let si = 0; si < sortedSlugs.length; si++) {
+          const s = sortedSlugs[si];
+          const name = playerDisplayNames[s] || s;
+          const sc = scenario.scores[s];
+          const span = document.createElement('span');
+          span.className = s === slug ? 'scenario-score-self' : 'scenario-score-other';
+          span.textContent = `${name} ${sc}`;
+          scoresWrap.appendChild(span);
+          if (si < sortedSlugs.length - 1) {
+            const sep = document.createTextNode('  ·  ');
+            scoresWrap.appendChild(sep);
+          }
+        }
+
+        cardHeader.appendChild(label);
+        cardHeader.appendChild(scoresWrap);
+        card.appendChild(cardHeader);
+
+        const outcomes = scenario.outcomes
+          .slice()
+          .sort((a, b) => b.position - a.position);
+
+        const scenarioMap = {};
+        for (const o of scenario.outcomes) scenarioMap[o.position] = o.winnerId;
+
+        const list = document.createElement('div');
+        list.className = 'scenario-outcomes';
+
+        for (const o of outcomes) {
+          const lp = 2 * o.position;
+          const rp = 2 * o.position + 1;
+          const left = lp >= 64 ? seeds[lp] : (master[lp] ?? scenarioMap[lp] ?? null);
+          const right = rp >= 64 ? seeds[rp] : (master[rp] ?? scenarioMap[rp] ?? null);
+          const loserId = o.winnerId === left ? right : left;
+
+          const item = document.createElement('div');
+          item.className = 'scenario-outcome-item';
+
+          const round = document.createElement('span');
+          round.className = 'scenario-outcome-round';
+          round.textContent = getRoundName(o.position);
+
+          const matchup = document.createElement('span');
+          matchup.className = 'scenario-outcome-matchup';
+          matchup.innerHTML = `<strong>${escapeHtml(teamName(teams, o.winnerId))}</strong> over ${escapeHtml(teamName(teams, loserId))}`;
+
+          item.appendChild(round);
+          item.appendChild(matchup);
+          list.appendChild(item);
+        }
+        card.appendChild(list);
+        scrollWrap.appendChild(card);
+      });
+
+      gamePopupContent.appendChild(scrollWrap);
+    }
+
     if (gamePopupOverlay) {
       gamePopupOverlay.setAttribute('aria-hidden', 'true');
     }
@@ -1267,7 +1577,7 @@ async function initApp() {
       renderLeaderboard(leaderboardEl, leaderboardData, (slug) => {
         selectedPlayer = slug;
         showBracket(slug);
-      });
+      }, scenarioData ? (slug) => openScenarioPopup(slug) : null);
     }
 
     function buildTabs(slugs) {
@@ -1353,7 +1663,7 @@ async function initApp() {
 
     renderLeaderboard(leaderboardEl, leaderboardData, (name) => {
       showBracket(name);
-    });
+    }, scenarioData ? (slug) => openScenarioPopup(slug) : null);
 
     const contestedEl = document.getElementById('contested-games');
     if (contestedEl) {
