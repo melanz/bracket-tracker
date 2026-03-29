@@ -1297,9 +1297,12 @@ async function initApp() {
       gamePopupContent.innerHTML = '';
       const L = 2 * pos;
       const R = 2 * pos + 1;
-      const leftTeam = displayTeamAt(L, bracketPlayerTree, bracketViewSeeds);
-      const rightTeam = displayTeamAt(R, bracketPlayerTree, bracketViewSeeds);
+      const actualLeft = displayTeamAt(L, master, seeds);
+      const actualRight = displayTeamAt(R, master, seeds);
       const actualWinner = master[pos];
+
+      const leftLabel = actualLeft != null ? teamName(teams, actualLeft) : 'TBD';
+      const rightLabel = actualRight != null ? teamName(teams, actualRight) : 'TBD';
 
       const header = document.createElement('div');
       header.className = 'game-popup-header';
@@ -1311,7 +1314,7 @@ async function initApp() {
       const h2 = document.createElement('h2');
       h2.className = 'game-popup-title';
       h2.id = 'game-popup-title';
-      h2.textContent = `${teamName(teams, leftTeam)} vs ${teamName(teams, rightTeam)}`;
+      h2.textContent = `${leftLabel} vs ${rightLabel}`;
 
       const sub = document.createElement('p');
       sub.className = 'game-popup-sub';
@@ -1327,13 +1330,13 @@ async function initApp() {
       matchupBox.className = 'game-popup-matchup';
       const t1 = document.createElement('span');
       t1.className = 'game-popup-team';
-      t1.textContent = teamName(teams, leftTeam);
+      t1.textContent = leftLabel;
       const vs = document.createElement('span');
       vs.className = 'game-popup-vs';
       vs.textContent = 'vs';
       const t2 = document.createElement('span');
       t2.className = 'game-popup-team';
-      t2.textContent = teamName(teams, rightTeam);
+      t2.textContent = rightLabel;
       matchupBox.appendChild(t1);
       matchupBox.appendChild(vs);
       matchupBox.appendChild(t2);
