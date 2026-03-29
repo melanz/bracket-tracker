@@ -1024,7 +1024,7 @@ function pickStatusDisplay(status) {
   }
 }
 
-function findContestedUpcomingGames(master, seeds, players, displayNames, n = 3) {
+function findContestedUpcomingGames(master, seeds, players, displayNames, eliminated, n = 3) {
   const upcoming = [];
   const playerSlugs = Object.keys(players);
 
@@ -1038,10 +1038,9 @@ function findContestedUpcomingGames(master, seeds, players, displayNames, n = 3)
       leftTeam = seeds[L];
       rightTeam = seeds[R];
     } else {
-      leftTeam = master[L];
-      rightTeam = master[R];
+      leftTeam = master[L] ?? null;
+      rightTeam = master[R] ?? null;
     }
-    if (leftTeam == null || rightTeam == null) continue;
 
     const pickGroups = {};
     for (const slug of playerSlugs) {
@@ -1056,7 +1055,8 @@ function findContestedUpcomingGames(master, seeds, players, displayNames, n = 3)
     const sizes = Object.values(pickGroups).map((g) => g.length);
     const balance = Math.min(...sizes) / sizes.reduce((a, b) => a + b, 0);
 
-    upcoming.push({ position: p, leftTeam, rightTeam, pickGroups, balance, round: getRoundName(p) });
+    const participantsKnown = leftTeam != null && rightTeam != null;
+    upcoming.push({ position: p, leftTeam, rightTeam, pickGroups, balance, round: getRoundName(p), participantsKnown });
   }
 
   upcoming.sort((a, b) => {
@@ -1070,7 +1070,7 @@ function findContestedUpcomingGames(master, seeds, players, displayNames, n = 3)
   return upcoming.slice(0, n);
 }
 
-function renderContestedGames(container, games, teams) {
+function renderContestedGames(container, games, teams, eliminated) {
   container.innerHTML = '';
   if (!games.length) return;
 
@@ -1105,7 +1105,16 @@ function renderContestedGames(container, games, teams) {
 
     const matchup = document.createElement('span');
     matchup.className = 'contested-matchup';
-    matchup.textContent = `${teamName(teams, game.leftTeam)} vs ${teamName(teams, game.rightTeam)}`;
+    if (game.participantsKnown) {
+      matchup.textContent = `${teamName(teams, game.leftTeam)} vs ${teamName(teams, game.rightTeam)}`;
+    } else {
+      const parts = [];
+      if (game.leftTeam != null) parts.push(teamName(teams, game.leftTeam));
+      else parts.push('TBD');
+      if (game.rightTeam != null) parts.push(teamName(teams, game.rightTeam));
+      else parts.push('TBD');
+      matchup.textContent = `${parts[0]} vs ${parts[1]}`;
+    }
     header.appendChild(matchup);
 
     card.appendChild(header);
@@ -1124,7 +1133,12 @@ function renderContestedGames(container, games, teams) {
 
     for (const [tid, names] of Object.entries(game.pickGroups)) {
       const teamId = Number(tid);
-      const isValid = teamId === game.leftTeam || teamId === game.rightTeam;
+      let isValid;
+      if (game.participantsKnown) {
+        isValid = teamId === game.leftTeam || teamId === game.rightTeam;
+      } else {
+        isValid = !eliminated.has(teamId);
+      }
       const group = document.createElement('div');
       group.className = 'contested-pick-group' + (isValid ? '' : ' busted');
 
@@ -1667,8 +1681,8 @@ async function initApp() {
 
     const contestedEl = document.getElementById('contested-games');
     if (contestedEl) {
-      const contested = findContestedUpcomingGames(master, seeds, players, playerDisplayNames, 3);
-      renderContestedGames(contestedEl, contested, teams);
+      const contested = findContestedUpcomingGames(master, seeds, players, playerDisplayNames, eliminated, 3);
+      renderContestedGames(contestedEl, contested, teams, eliminated);
       syncLiveMatchupHighlights(document);
       ensureLiveMatchupTicker();
     }
